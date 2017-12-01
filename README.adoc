@@ -1,0 +1,10 @@
+== 项目信息
+* 基于consul实现服务注册发现
+* jdk1.8
+* Consul v1.0.1
+
+== 运行项目
+* ./consul agent -server -bind 127.0.0.1 -ui -data-dir data -bootstrap -datacenter ShangHai
+* 访问 http://localhost:8500/ui/ 查看consul注册中心启动情况
+* 运行DemoApplication.java
+* 访问 http://localhost:8500/ui/ 查看服务在consul注册成功
