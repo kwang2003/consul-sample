@@ -4,7 +4,157 @@
 * Consul v1.0.1
 
 == 运行项目
-* ./consul agent -server -bind 127.0.0.1 -ui -data-dir data -bootstrap -datacenter ShangHai
+* ./consul agent -server -bind 192.168.1.103 -ui -data-dir data -bootstrap -datacenter ShangHai -node server1
 * 访问 http://localhost:8500/ui/ 查看consul注册中心启动情况
 * 运行DemoApplication.java
 * 访问 http://localhost:8500/ui/ 查看服务在consul注册成功
+
+== 集群搭建
+推荐搭建server节点是3个或5个的集群，这里我们搭建3个server节点(server1上运行ui界面）
+按照如下顺序，在几个节点上依次执行对应的命令
+* server1:192.168.1.103 lenovo
+
+----
+[kevin@lenovo consul1.0.1]$ consul agent -server -bind 192.168.1.103 -ui -data-dir data  -datacenter ShangHai -node lenovo -bootstrap-expect 3
+bootstrap_expect > 0: expecting 3 servers
+==> Starting Consul agent...
+==> Consul agent running!
+           Version: 'v1.0.1'
+           Node ID: '237680ba-7a99-b00f-5221-bbde91379d5b'
+         Node name: 'lenovo'
+        Datacenter: 'shanghai' (Segment: '<all>')
+            Server: true (Bootstrap: false)
+       Client Addr: [127.0.0.1] (HTTP: 8500, HTTPS: -1, DNS: 8600)
+      Cluster Addr: 192.168.1.103 (LAN: 8301, WAN: 8302)
+           Encrypt: Gossip: false, TLS-Outgoing: false, TLS-Incoming: false
+
+==> Log data will now stream in as it occurs:
+
+    2017/12/02 11:10:50 [INFO] raft: Initial configuration (index=0): []
+    2017/12/02 11:10:50 [INFO] raft: Node at 192.168.1.103:8300 [Follower] entering Follower state (Leader: "")
+    2017/12/02 11:10:50 [INFO] serf: EventMemberJoin: lenovo.shanghai 192.168.1.103
+    2017/12/02 11:10:50 [INFO] serf: EventMemberJoin: lenovo 192.168.1.103
+    2017/12/02 11:10:50 [INFO] agent: Started DNS server 127.0.0.1:8600 (udp)
+    2017/12/02 11:10:50 [INFO] consul: Handled member-join event for server "lenovo.shanghai" in area "wan"
+    2017/12/02 11:10:50 [INFO] consul: Adding LAN server lenovo (Addr: tcp/192.168.1.103:8300) (DC: shanghai)
+    2017/12/02 11:10:50 [INFO] agent: Started DNS server 127.0.0.1:8600 (tcp)
+    2017/12/02 11:10:50 [INFO] agent: Started HTTP server on 127.0.0.1:8500 (tcp)
+    2017/12/02 11:10:50 [INFO] agent: started state syncer
+    2017/12/02 11:10:57 [ERR] agent: failed to sync remote state: No cluster leader
+    2017/12/02 11:10:58 [WARN] raft: no known peers, aborting election
+    2017/12/02 11:11:01 [ERR] http: Request GET /v1/catalog/services?wait=2s&index=104, error: No cluster leader from=127.0.0.1:44290
+    2017/12/02 11:11:09 [ERR] http: Request GET /v1/coordinate/nodes?dc=shanghai&token=<hidden>, error: No cluster leader from=127.0.0.1:44320
+    2017/12/02 11:11:24 [ERR] agent: Coordinate update error: No cluster leader
+    2017/12/02 11:11:25 [ERR] agent: failed to sync remote state: No cluster leader
+----
+在输出的信息里我们会看到[ERR] agent: Coordinate update error: No cluster leader ，这是因为当前这个集群还没有搭建完毕，没法选举出leader，等待下面的步骤都执行完毕了，这个错误就没有了
+* server2:192.168.1.102 haier
+
+----
+[kevin@haier ~]$ consul agent -server -bind 192.168.1.102 -data-dir data  -datacenter ShangHai -node haier -bootstrap-expect 3
+----
+
+* server3:192.168.1.104 sumsung
+
+----
+[kevin@sumsung ~]$ consul agent -server -bind 192.168.1.104 -data-dir data  -datacenter ShangHai -node sumsung -bootstrap-expect 3
+----
+
+* 在server2:192.168.1.102 haier 上运行
+
+----
+[kevin@haier ~]$ consul-join 192.168.1.103 
+----
+
+* 在server2:192.168.1.104 sumsung 上运行
+
+----
+[kevin@sumsung ~]$ consul-join 192.168.1.103 
+----
+执行完毕这些命令后，刚开始在控制台打印出来的[ERR]信息就不见了，通过下个部分的consul常用指令可以看到当前集群的成员状态以及leader信息了
+
+== consul常用指令
+* 查看集群成员
+
+----
+[kevin@lenovo ~]$ consul members
+Node     Address             Status  Type    Build  Protocol  DC        Segment
+haier    192.168.1.102:8301  alive   server  1.0.1  2         shanghai  <all>
+lenovo   192.168.1.103:8301  alive   server  1.0.1  2         shanghai  <all>
+sumsung  192.168.1.104:8301  alive   server  1.0.1  2         shanghai  <all>
+[kevin@lenovo ~]$ 
+----
+* 查看当前节点状态
+查看 leader=false/true判断当前节点是否为leader节点
+
+----
+[kevin@lenovo ~]$ consul info
+agent:
+	check_monitors = 0
+	check_ttls = 0
+	checks = 1
+	services = 1
+build:
+	prerelease = 
+	revision = 9564c29
+	version = 1.0.1
+consul:
+	bootstrap = false
+	known_datacenters = 1
+	leader = false
+	leader_addr = 192.168.1.102:8300
+	server = true
+raft:
+	applied_index = 219
+	commit_index = 219
+	fsm_pending = 0
+	last_contact = 83.944325ms
+	last_log_index = 219
+	last_log_term = 5
+	last_snapshot_index = 0
+	last_snapshot_term = 0
+	latest_configuration = [{Suffrage:Voter ID:ec94319a-00d7-fa5d-b29b-aeddca2a101c Address:192.168.1.103:8300} {Suffrage:Voter ID:effd2194-4f32-c804-5844-30fbaff7b21b Address:192.168.1.102:8300} {Suffrage:Voter ID:426b6c47-4234-199b-8ad1-bce894fa1cbd Address:192.168.1.104:8300}]
+	latest_configuration_index = 53
+	num_peers = 2
+	protocol_version = 3
+	protocol_version_max = 3
+	protocol_version_min = 0
+	snapshot_version_max = 1
+	snapshot_version_min = 0
+	state = Follower
+	term = 5
+runtime:
+	arch = amd64
+	cpu_count = 2
+	goroutines = 91
+	max_procs = 2
+	os = linux
+	version = go1.9.2
+serf_lan:
+	coordinate_resets = 0
+	encrypted = false
+	event_queue = 0
+	event_time = 4
+	failed = 0
+	health_score = 0
+	intent_queue = 0
+	left = 0
+	member_time = 3
+	members = 3
+	query_queue = 0
+	query_time = 1
+serf_wan:
+	coordinate_resets = 0
+	encrypted = false
+	event_queue = 0
+	event_time = 1
+	failed = 0
+	health_score = 0
+	intent_queue = 0
+	left = 0
+	member_time = 4
+	members = 3
+	query_queue = 0
+	query_time = 1
+[kevin@lenovo ~]$ 
+----
