@@ -47,7 +47,7 @@ bootstrap_expect > 0: expecting 3 servers
     2017/12/02 11:11:24 [ERR] agent: Coordinate update error: No cluster leader
     2017/12/02 11:11:25 [ERR] agent: failed to sync remote state: No cluster leader
 ----
-在输出的信息里我们会看到[ERR] agent: Coordinate update error: No cluster leader ，这是因为当前这个集群还没有搭建完毕，没法选举出leader，等待下面的步骤都执行完毕了，这个错误就没有了
+在输出的信息里我们会看到[ERR] agent: Coordinate update error: No cluster leader ，这是因为-bootstrap-expect 这个参数：该命令通知consul server我们现在准备加入的server节点个数，该参数是为了延迟日志复制的启动直到我们指定数量的server节点成功的加入后启动。
 * server2:192.168.1.102 haier
 
 ----
@@ -158,3 +158,33 @@ serf_wan:
 	query_time = 1
 [kevin@lenovo ~]$ 
 ----
+
+== consul agent命令的常用选项及其解释
+* -data-dir
+** 作用：指定agent存储数据的位置
+** 所有agent必须的参数
+** 对于server尤其重要，靠这个参数来持久化数据
+* -dev
+** 作用：以开发模式运行server节点
+** 使用该参数后，数据将存在内存中，没法持久化，当节点重启后数据会丢失，通常用于本地测试使用，绝不要用于生产环境
+* -bootstrap-expect
+** 作用：通知consul集群要加入的server节点数量，当节点启动时会检查集群中的节点数，如果小于该参数指定的值，启动会报错等待，直到指定数量的节点都加入进来后才完成启动。
+* -node
+** 作用：指定节点在集群中的名称
+** 该名称在集群中是唯一的
+** 推荐直接使用节点的IP地址
+* -bind
+** 作用：指明节点的IP地址
+** 有的服务器会有多个IP地址，不指定会报错Failed to get advertise address: Multiple private IPs found. Please configure one，通过该参数强制绑定固定的IP上
+* -server
+** 作用：consul以server模式启动
+** 每个数据中心(datacenter)的server数量至少是1，可以是3个或5个
+** server 是与其他数据中心进行交互的门面
+** server集群中的状态是一致的
+* -client
+** 作用：节点以client模式启动，指定客户端的绑定地址
+** 如果不指定-server ，默认就是-client模式
+* -join
+** 作用：将节点加入集群
+* -datacenter
+** 作用：指定数据中心，如shanghai  qingdao
